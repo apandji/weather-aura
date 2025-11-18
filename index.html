@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>weather aura generator</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>weather aura generator</h1>
+            <p class="subtitle">internal tool to test visual variation in weather auras</p>
+        </header>
+
+        <div class="main-content">
+            <div class="aura-display">
+                <div id="aura" class="aura-visualization"></div>
+                <div class="weather-info">
+                    <div class="info-item location-item">
+                        <span class="label">Location:</span>
+                        <span id="location-display">New York, NY</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Temperature:</span>
+                        <span id="temp-display">20°C</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Wind Speed:</span>
+                        <span id="wind-display">5 km/h</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Air Quality:</span>
+                        <span id="air-display">Good</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="controls-panel">
+                <div class="control-group">
+                    <h3>Location</h3>
+                    <label>
+                        <span>Search Location:</span>
+                        <div class="search-container">
+                            <input type="text" id="location-search" placeholder="e.g., St. Louis, Denver, Tokyo" autocomplete="off">
+                            <button id="search-btn" class="btn-search">Search</button>
+                            <button id="random-btn" class="btn-search">Random</button>
+                            <button id="refresh-btn" class="btn-search">Refresh Data</button>
+                        </div>
+                        <div id="search-status" class="search-status"></div>
+                    </label>
+                    <div class="control-row">
+                        <label>
+                            <span>Latitude:</span>
+                            <input type="number" id="latitude" value="40.7128" step="0.0001" min="-90" max="90">
+                        </label>
+                        <label>
+                            <span>Longitude:</span>
+                            <input type="number" id="longitude" value="-74.0060" step="0.0001" min="-180" max="180">
+                        </label>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <h3>Aura Mode</h3>
+                    <div class="mode-selector">
+                        <button class="mode-btn active" data-mode="radial">Radial</button>
+                        <button class="mode-btn" data-mode="layered">Layered</button>
+                        <button class="mode-btn" data-mode="swirl">Swirl</button>
+                        <button class="mode-btn" data-mode="linear">Linear</button>
+                        <button class="mode-btn" data-mode="particle">Particle</button>
+                        <button class="mode-btn" data-mode="fractal">Fractal</button>
+                        <button class="mode-btn" data-mode="randomizer">Randomizer</button>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <h3>Atmospheric Conditions</h3>
+                    <label>
+                        <span>Altitude (m):</span>
+                        <input type="range" id="altitude" min="0" max="8848" value="100" step="10">
+                        <span class="value-display" id="altitude-value">100 m</span>
+                    </label>
+                    <label>
+                        <span>Cloud Cover (%):</span>
+                        <input type="range" id="cloudCover" min="0" max="100" value="50" step="1">
+                        <span class="value-display" id="cloudCover-value">50%</span>
+                    </label>
+                    <label>
+                        <span>Temperature (°C):</span>
+                        <input type="range" id="temperature" min="-50" max="50" value="20" step="1">
+                        <span class="value-display" id="temperature-value">20°C</span>
+                    </label>
+                    <label>
+                        <span>Air Quality Index:</span>
+                        <input type="range" id="airQuality" min="0" max="500" value="50" step="1">
+                        <span class="value-display" id="airQuality-value">50 (Good)</span>
+                    </label>
+                    <label>
+                        <span>Wind Speed (km/h):</span>
+                        <input type="range" id="windSpeed" min="0" max="250" value="10" step="1">
+                        <span class="value-display" id="windSpeed-value">10 km/h</span>
+                    </label>
+                    <label>
+                        <span>Precipitation (mm/h):</span>
+                        <input type="range" id="precipitation" min="0" max="50" value="0" step="0.1">
+                        <span class="value-display" id="precipitation-value">0 mm/h</span>
+                    </label>
+                </div>
+
+                <div class="control-group">
+                    <button id="reset-btn" class="btn-reset">Reset to Default</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+<footer>
+    <small class="caption">made by pandjico. built in collaboration with cursor, using open-meteo and openstreetmap nominatim</small>
+</footer>
+</html>
+
