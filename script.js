@@ -53,6 +53,7 @@ class WeatherAura {
         this.randomBtn = document.getElementById('random-btn');
         this.refreshBtn = document.getElementById('refresh-btn');
         this.resetBtn = document.getElementById('reset-btn');
+        this.downloadGifBtn = document.getElementById('download-gif-btn');
         this.modeButtons = document.querySelectorAll('.mode-btn');
     }
 
@@ -118,6 +119,7 @@ class WeatherAura {
         });
 
         this.resetBtn.addEventListener('click', () => this.reset());
+        this.downloadGifBtn.addEventListener('click', () => this.downloadGIF());
     }
 
     async searchLocation() {
@@ -1697,6 +1699,96 @@ class WeatherAura {
         
         this.updateValueDisplays();
         this.updateAura();
+    }
+
+    async downloadGIF() {
+        // Disable button during capture
+        if (this.downloadGifBtn) {
+            this.downloadGifBtn.disabled = true;
+            this.downloadGifBtn.textContent = 'Capturing...';
+        }
+
+        try {
+            // Get the aura element and its container
+            const auraElement = this.aura;
+            const auraDisplay = auraElement.closest('.aura-display');
+            
+            // Calculate animation duration from current wind speed
+            const wind = parseFloat(this.windSpeed.value);
+            const baseDuration = Math.max(2 - (wind / 100), 0.8);
+            const animationDuration = baseDuration * 1000; // Convert to milliseconds
+            
+            // Number of frames to capture (30 fps for smooth animation)
+            const fps = 30;
+            const numFrames = Math.ceil((animationDuration / 1000) * fps);
+            const frameDelay = 1000 / fps; // Delay between frames in ms
+            
+            // Create GIF instance
+            const gif = new GIF({
+                workers: 2,
+                quality: 10,
+                width: 400,
+                height: 400,
+                workerScript: 'https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js'
+            });
+
+            // Capture frames
+            for (let i = 0; i < numFrames; i++) {
+                // Wait for the frame to be in the right position in the animation
+                await new Promise(resolve => setTimeout(resolve, frameDelay));
+                
+                // Capture the aura element
+                const canvas = await html2canvas(auraElement, {
+                    backgroundColor: null,
+                    scale: 1,
+                    logging: false,
+                    useCORS: true,
+                    allowTaint: false,
+                    width: 400,
+                    height: 400
+                });
+                
+                // Add frame to GIF
+                gif.addFrame(canvas, { delay: frameDelay });
+            }
+
+            // Render the GIF
+            gif.on('finished', (blob) => {
+                // Create download link
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                
+                // Generate filename with location and timestamp
+                const location = this.locationDisplay.textContent.replace(/[^a-zA-Z0-9]/g, '_') || 'aura';
+                const timestamp = new Date().toISOString().slice(0, 10);
+                a.download = `weather-aura-${location}-${timestamp}.gif`;
+                
+                // Trigger download
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                // Re-enable button
+                if (this.downloadGifBtn) {
+                    this.downloadGifBtn.disabled = false;
+                    this.downloadGifBtn.textContent = 'Download GIF';
+                }
+            });
+
+            gif.render();
+            
+        } catch (error) {
+            console.error('Error creating GIF:', error);
+            alert('Failed to create GIF. Please try again.');
+            
+            // Re-enable button on error
+            if (this.downloadGifBtn) {
+                this.downloadGifBtn.disabled = false;
+                this.downloadGifBtn.textContent = 'Download GIF';
+            }
+        }
     }
 }
 
