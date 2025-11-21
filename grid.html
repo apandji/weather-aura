@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>weather aura grid</title>
+    <link rel="stylesheet" href="grid.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <div class="header-text">
+                    <h1>weather aura grid</h1>
+                    <p class="subtitle">projected weather changes across locations</p>
+                </div>
+                <button id="detail-toggle" class="btn-detail-toggle" title="Toggle detailed view">
+                    <span class="toggle-icon">📊</span>
+                    <span class="toggle-text">Details</span>
+                </button>
+            </div>
+        </header>
+
+        <div id="grid-container" class="grid-container">
+            <!-- Auras will be dynamically generated here -->
+        </div>
+
+        <div class="controls-panel">
+            <div class="time-control">
+                <button id="play-pause-btn" class="btn-play-pause" title="Play/Pause animation">
+                    <span class="play-icon">▶</span>
+                    <span class="pause-icon">⏸</span>
+                </button>
+                <div class="slider-container">
+                    <label for="time-slider">
+                        <span id="time-label">Current Time</span>
+                    </label>
+                    <input type="range" id="time-slider" min="0" max="24" value="0" step="1">
+                    <div class="time-display">
+                        <span class="time-start">Now</span>
+                        <span class="time-end">+24h</span>
+                    </div>
+                </div>
+            </div>
+            <button id="refresh-btn" class="btn-refresh">Refresh All</button>
+        </div>
+    </div>
+
+    <script src="grid.js"></script>
+</body>
+</html>
+

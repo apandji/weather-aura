@@ -1,0 +1,404 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background: #f5f5f5;
+    min-height: 100vh;
+    color: #000;
+    padding: 20px;
+}
+
+.container {
+    max-width: 100%;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+header {
+    margin-bottom: 30px;
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.header-text {
+    text-align: center;
+    flex: 1;
+}
+
+header h1 {
+    font-size: 2rem;
+    font-weight: normal;
+    text-transform: lowercase;
+    margin-bottom: 8px;
+    color: #000;
+}
+
+.subtitle {
+    font-size: 0.9rem;
+    color: #666;
+    text-transform: lowercase;
+}
+
+.btn-detail-toggle {
+    padding: 10px 20px;
+    border: 1px solid #000;
+    background: #fff;
+    color: #000;
+    font-weight: normal;
+    cursor: pointer;
+    font-size: 0.9rem;
+    text-transform: lowercase;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+}
+
+.btn-detail-toggle:hover {
+    background: #000;
+    color: #fff;
+}
+
+.btn-detail-toggle.active {
+    background: #000;
+    color: #fff;
+}
+
+.toggle-icon {
+    font-size: 1rem;
+}
+
+.toggle-text {
+    font-size: 0.85rem;
+}
+
+.grid-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 20px;
+    flex: 1;
+    padding: 20px 0;
+}
+
+.aura-card {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    position: relative;
+}
+
+.aura-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.location-name {
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-align: center;
+    color: #000;
+    text-transform: lowercase;
+    line-height: 1.3;
+}
+
+.aura-visualization {
+    width: 100%;
+    max-width: 180px;
+    aspect-ratio: 1;
+    position: relative;
+    transition: clip-path 0.5s ease, background 0.5s ease, filter 0.5s ease, transform 0.5s ease, opacity 0.5s ease, box-shadow 0.5s ease;
+    will-change: clip-path, background, filter, transform, box-shadow;
+}
+
+.inclement-score {
+    font-size: 0.85rem;
+    color: #666;
+    text-align: center;
+}
+
+.inclement-score .label {
+    color: #999;
+    margin-right: 4px;
+}
+
+.inclement-score .value {
+    font-weight: 500;
+    color: #000;
+}
+
+.controls-panel {
+    position: sticky;
+    bottom: 0;
+    background: #fff;
+    border-top: 1px solid #ddd;
+    padding: 20px;
+    margin-top: auto;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.time-control {
+    margin-bottom: 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+}
+
+.btn-play-pause {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 1px solid #000;
+    background: #fff;
+    color: #000;
+    cursor: pointer;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.2s ease;
+    border-radius: 4px;
+}
+
+.btn-play-pause:hover {
+    background: #000;
+    color: #fff;
+}
+
+.btn-play-pause.playing {
+    background: #000;
+    color: #fff;
+}
+
+.btn-play-pause .pause-icon {
+    display: none;
+}
+
+.btn-play-pause.playing .play-icon {
+    display: none;
+}
+
+.btn-play-pause.playing .pause-icon {
+    display: block;
+}
+
+.slider-container {
+    flex: 1;
+}
+
+.time-control label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+    color: #000;
+    text-transform: lowercase;
+}
+
+#time-slider {
+    width: 100%;
+    height: 6px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: #ddd;
+    outline: none;
+    border-radius: 3px;
+    margin-bottom: 8px;
+}
+
+#time-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    background: #000;
+    cursor: pointer;
+    border-radius: 50%;
+}
+
+#time-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    background: #000;
+    cursor: pointer;
+    border-radius: 50%;
+    border: none;
+}
+
+.time-display {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: #999;
+}
+
+.btn-refresh {
+    width: 100%;
+    padding: 12px 24px;
+    border: 1px solid #000;
+    background: #fff;
+    color: #000;
+    font-weight: normal;
+    cursor: pointer;
+    font-size: 0.95rem;
+    text-transform: lowercase;
+}
+
+.btn-refresh:hover:not(:disabled) {
+    background: #000;
+    color: #fff;
+}
+
+.btn-refresh:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.aura-card.placeholder {
+    animation: pulse-placeholder 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-placeholder {
+    0%, 100% {
+        opacity: 0.3;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* Detailed view styles */
+.aura-card.detailed-view {
+    position: relative;
+}
+
+.aura-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.35);
+    border-radius: 8px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    z-index: 10;
+    overflow-y: auto;
+    backdrop-filter: blur(30px); /* Apply a 10px blur to the background */
+    -webkit-backdrop-filter: blur(30px); /* For older WebKit browsers */
+}
+
+.aura-card.detailed-view .aura-overlay {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.weather-detail-item {
+    font-size: 0.75rem;
+    line-height: 1.4;
+    color: #000;
+}
+
+.weather-detail-item .label {
+    color: #666;
+    margin-right: 6px;
+    text-transform: lowercase;
+}
+
+.weather-detail-item .value {
+    font-weight: 500;
+    color: #000;
+}
+
+.weather-detail-location {
+    font-size: 0.9rem;
+    font-weight: 500;
+    margin-bottom: 4px;
+    color: #000;
+    text-transform: lowercase;
+}
+
+/* Responsive: Minimum 2 per row on mobile */
+@media (max-width: 600px) {
+    .grid-container {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+        padding: 16px 0;
+    }
+
+    .aura-card {
+        padding: 16px;
+    }
+
+    .aura-visualization {
+        max-width: 100%;
+    }
+
+    header h1 {
+        font-size: 1.5rem;
+    }
+
+    .header-content {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .btn-detail-toggle {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .controls-panel {
+        padding: 16px;
+    }
+
+    .time-control {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .btn-play-pause {
+        align-self: flex-start;
+    }
+}
+
+/* Larger screens get more columns */
+@media (min-width: 1200px) {
+    .grid-container {
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    }
+}
+
+@media (min-width: 1600px) {
+    .grid-container {
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    }
+}
+
