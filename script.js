@@ -16,7 +16,8 @@ class WeatherAura {
         };
         this.initializeElements();
         this.attachEventListeners();
-        this.updateAura();
+        // Try to get user location and fetch weather, fallback to St. Louis
+        this.initializeLocation();
     }
 
     initializeElements() {
@@ -39,6 +40,12 @@ class WeatherAura {
         this.tempDisplay = document.getElementById('temp-display');
         this.windDisplay = document.getElementById('wind-display');
         this.airDisplay = document.getElementById('air-display');
+        this.inclementDisplay = document.getElementById('inclement-display');
+        this.inclementItem = document.getElementById('inclement-item');
+        this.inclementTooltip = document.getElementById('inclement-tooltip');
+        
+        // Store current inclement data for tooltip
+        this.currentInclementData = null;
         
         // Value displays
         this.altitudeValue = document.getElementById('altitude-value');
@@ -53,7 +60,6 @@ class WeatherAura {
         this.randomBtn = document.getElementById('random-btn');
         this.refreshBtn = document.getElementById('refresh-btn');
         this.resetBtn = document.getElementById('reset-btn');
-        this.downloadGifBtn = document.getElementById('download-gif-btn');
         this.modeButtons = document.querySelectorAll('.mode-btn');
     }
 
@@ -119,7 +125,145 @@ class WeatherAura {
         });
 
         this.resetBtn.addEventListener('click', () => this.reset());
-        this.downloadGifBtn.addEventListener('click', () => this.downloadGIF());
+        
+        // Inclement score tooltip hover
+        if (this.inclementItem && this.inclementTooltip) {
+            this.inclementItem.addEventListener('mouseenter', () => {
+                if (this.currentInclementData) {
+                    this.inclementTooltip.style.opacity = '1';
+                    this.inclementTooltip.style.visibility = 'visible';
+                }
+            });
+            
+            this.inclementItem.addEventListener('mouseleave', () => {
+                this.inclementTooltip.style.opacity = '0';
+                this.inclementTooltip.style.visibility = 'hidden';
+            });
+        }
+    }
+
+    async initializeLocation() {
+        // Try to get user's current location
+        if (navigator.geolocation) {
+            try {
+                const position = await new Promise((resolve, reject) => {
+                    // Set a timeout for geolocation (5 seconds)
+                    const timeout = setTimeout(() => {
+                        reject(new Error('Geolocation timeout'));
+                    }, 5000);
+                    
+                    navigator.geolocation.getCurrentPosition(
+                        (pos) => {
+                            clearTimeout(timeout);
+                            resolve(pos);
+                        },
+                        (err) => {
+                            clearTimeout(timeout);
+                            reject(err);
+                        }
+                    );
+                });
+
+                const lat = position.coords.latitude;
+                const lon = position.coords.longitude;
+                
+                this.latitude.value = lat.toFixed(4);
+                this.longitude.value = lon.toFixed(4);
+                
+                // Get elevation
+                try {
+                    const elevResponse = await fetch(
+                        `https://api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lon}`
+                    );
+                    const elevData = await elevResponse.json();
+                    if (elevData.elevation && elevData.elevation[0]) {
+                        this.altitude.value = Math.round(elevData.elevation[0]);
+                    }
+                } catch (e) {
+                    // If elevation fails, use default
+                    this.altitude.value = 100;
+                }
+                
+                // Reverse geocode to get location name
+                await this.reverseGeocodeFromCoords(lat, lon);
+                
+                // Fetch live weather data
+                await this.fetchLiveWeather(true); // silent mode
+                
+                this.updateValueDisplays();
+                this.updateAura();
+                return;
+            } catch (error) {
+                console.log('Geolocation failed, falling back to St. Louis:', error);
+                // Fall through to St. Louis fallback
+            }
+        }
+        
+        // Fallback to St. Louis if geolocation fails or is not available
+        await this.setStLouisLocation();
+    }
+
+    async setStLouisLocation() {
+        // St. Louis coordinates
+        const stLouisLat = 38.6270;
+        const stLouisLon = -90.1994;
+        
+        this.latitude.value = stLouisLat.toFixed(4);
+        this.longitude.value = stLouisLon.toFixed(4);
+        
+        // Get elevation for St. Louis
+        try {
+            const elevResponse = await fetch(
+                `https://api.open-meteo.com/v1/elevation?latitude=${stLouisLat}&longitude=${stLouisLon}`
+            );
+            const elevData = await elevResponse.json();
+            if (elevData.elevation && elevData.elevation[0]) {
+                this.altitude.value = Math.round(elevData.elevation[0]);
+            } else {
+                this.altitude.value = 150; // Default elevation for St. Louis
+            }
+        } catch (e) {
+            this.altitude.value = 150;
+        }
+        
+        // Reverse geocode to get location name
+        await this.reverseGeocodeFromCoords(stLouisLat, stLouisLon);
+        
+        // Fetch live weather data
+        await this.fetchLiveWeather(true); // silent mode
+        
+        this.updateValueDisplays();
+        this.updateAura();
+    }
+
+    async reverseGeocodeFromCoords(lat, lon) {
+        try {
+            const response = await fetch(
+                `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`,
+                {
+                    headers: {
+                        'User-Agent': 'WeatherAuraGenerator/1.0'
+                    }
+                }
+            );
+            
+            const data = await response.json();
+            
+            if (data) {
+                const locationName = this.updateLocationDisplay(data.display_name || null, data);
+                if (!locationName) {
+                    // Fallback if extraction fails
+                    if (data.display_name) {
+                        this.locationDisplay.textContent = data.display_name.split(',')[0] || 'Location';
+                    } else {
+                        this.locationDisplay.textContent = 'Unknown Location';
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Reverse geocoding error:', error);
+            // Keep default location display
+        }
     }
 
     async searchLocation() {
@@ -315,6 +459,91 @@ class WeatherAura {
         this.tempDisplay.textContent = `${this.temperature.value}°C`;
         this.windDisplay.textContent = `${this.windSpeed.value} km/h`;
         this.airDisplay.textContent = this.getAirQualityLabel(aq);
+        
+        // Update inclement score display
+        this.updateInclementDisplay();
+    }
+    
+    updateInclementDisplay() {
+        if (!this.inclementDisplay) return;
+        
+        if (!this.currentInclementData) {
+            // Calculate current inclement data if not available
+            const clouds = parseFloat(this.cloudCover.value);
+            const wind = parseFloat(this.windSpeed.value);
+            const precip = parseFloat(this.precipitation.value);
+            this.currentInclementData = this.calculateInclementScore(
+                this.weatherData, 
+                wind, 
+                precip, 
+                clouds
+            );
+        }
+        
+        const score = this.currentInclementData.score;
+        this.inclementDisplay.textContent = score.toFixed(2);
+        
+        // Update tooltip content
+        this.updateInclementTooltip();
+    }
+    
+    updateInclementTooltip() {
+        if (!this.currentInclementData || !this.inclementTooltip) return;
+        
+        const { score, weatherType, factors } = this.currentInclementData;
+        const tooltipContent = this.inclementTooltip.querySelector('.tooltip-content');
+        
+        if (!tooltipContent) return;
+        
+        // Format weather type name
+        const weatherTypeNames = {
+            'thunderstorm': 'Thunderstorm',
+            'heavy_rain': 'Heavy Rain',
+            'heavy_snow': 'Heavy Snow',
+            'high_wind': 'High Wind',
+            'showers': 'Showers',
+            'light_precip': 'Light Precipitation',
+            'fog': 'Fog',
+            'normal': 'Normal'
+        };
+        
+        let html = `<div class="tooltip-section">`;
+        html += `<div class="tooltip-title">Weather Type:</div>`;
+        html += `<div class="tooltip-value">${weatherTypeNames[weatherType] || weatherType}</div>`;
+        html += `</div>`;
+        
+        html += `<div class="tooltip-section">`;
+        html += `<div class="tooltip-title">Contributing Factors:</div>`;
+        
+        // Sort factors by contribution (value * weight)
+        const sortedFactors = factors
+            .map(f => ({
+                ...f,
+                contribution: f.value * f.weight
+            }))
+            .sort((a, b) => b.contribution - a.contribution)
+            .filter(f => f.contribution > 0.01); // Only show factors with meaningful contribution
+        
+        sortedFactors.forEach(factor => {
+            const percentage = (factor.contribution / score * 100).toFixed(0);
+            const factorNames = {
+                'weatherCode': 'Weather Code',
+                'wind': 'Wind Speed',
+                'precipitation': 'Precipitation',
+                'visibility': 'Visibility',
+                'cloudCover': 'Cloud Cover'
+            };
+            
+            html += `<div class="tooltip-factor">`;
+            html += `<span class="factor-name">${factorNames[factor.name] || factor.name}:</span>`;
+            html += `<span class="factor-value">${(factor.value * 100).toFixed(0)}%</span>`;
+            html += `<span class="factor-contribution">(${percentage}% of score)</span>`;
+            html += `</div>`;
+        });
+        
+        html += `</div>`;
+        
+        tooltipContent.innerHTML = html;
     }
 
     // Extract a shorter, more readable location name
@@ -782,6 +1011,253 @@ class WeatherAura {
         return Math.round(3 + ((clouds - 30) / 10));
     }
 
+    // Calculate inclement weather score (0-1 spectrum)
+    // Combines multiple factors to create a gradual danger/aggressiveness score
+    calculateInclementScore(weatherData, windSpeed, precipitation, cloudCover) {
+        let score = 0;
+        const factors = [];
+        
+        // Weather code severity (WMO codes)
+        const weatherCode = weatherData?.weatherCode || 0;
+        let weatherCodeScore = 0;
+        let weatherType = 'normal';
+        
+        // Thunderstorms (most severe)
+        if (weatherCode >= 95 && weatherCode <= 99) {
+            weatherCodeScore = 0.9 + ((weatherCode - 95) / 4) * 0.1; // 0.9 to 1.0
+            weatherType = 'thunderstorm';
+        }
+        // Heavy snow
+        else if (weatherCode >= 71 && weatherCode <= 77) {
+            weatherCodeScore = 0.6 + ((weatherCode - 71) / 6) * 0.2; // 0.6 to 0.8
+            weatherType = 'heavy_snow';
+        }
+        // Heavy rain
+        else if (weatherCode >= 61 && weatherCode <= 67) {
+            weatherCodeScore = 0.5 + ((weatherCode - 61) / 6) * 0.2; // 0.5 to 0.7
+            weatherType = 'heavy_rain';
+        }
+        // Showers (moderate)
+        else if (weatherCode >= 80 && weatherCode <= 86) {
+            weatherCodeScore = 0.3 + ((weatherCode - 80) / 6) * 0.2; // 0.3 to 0.5
+            weatherType = 'showers';
+        }
+        // Light precipitation
+        else if (weatherCode >= 51 && weatherCode <= 57) {
+            weatherCodeScore = 0.15 + ((weatherCode - 51) / 6) * 0.1; // 0.15 to 0.25
+            weatherType = 'light_precip';
+        }
+        // Fog (reduces visibility)
+        else if (weatherCode >= 45 && weatherCode <= 49) {
+            weatherCodeScore = 0.2;
+            weatherType = 'fog';
+        }
+        
+        factors.push({ name: 'weatherCode', value: weatherCodeScore, weight: 0.4 });
+        
+        // Wind speed contribution (0-1, normalized)
+        // Moderate wind (30-50 km/h) = 0.3-0.5, Strong (50-80) = 0.5-0.7, Very strong (80+) = 0.7-1.0
+        const wind = parseFloat(windSpeed) || 0;
+        let windScore = 0;
+        if (wind > 80) {
+            windScore = 0.7 + Math.min(0.3, (wind - 80) / 100); // 0.7 to 1.0
+        } else if (wind > 50) {
+            windScore = 0.5 + ((wind - 50) / 30) * 0.2; // 0.5 to 0.7
+        } else if (wind > 30) {
+            windScore = 0.3 + ((wind - 30) / 20) * 0.2; // 0.3 to 0.5
+        } else if (wind > 15) {
+            windScore = 0.1 + ((wind - 15) / 15) * 0.2; // 0.1 to 0.3
+        } else {
+            windScore = wind / 15 * 0.1; // 0 to 0.1
+        }
+        
+        // If high wind, override weather type
+        if (windScore > 0.6 && weatherType === 'normal') {
+            weatherType = 'high_wind';
+        }
+        factors.push({ name: 'wind', value: windScore, weight: 0.25 });
+        
+        // Precipitation intensity contribution
+        const precip = parseFloat(precipitation) || 0;
+        let precipScore = 0;
+        if (precip > 10) {
+            precipScore = 0.7 + Math.min(0.3, (precip - 10) / 20); // 0.7 to 1.0
+        } else if (precip > 5) {
+            precipScore = 0.5 + ((precip - 5) / 5) * 0.2; // 0.5 to 0.7
+        } else if (precip > 2) {
+            precipScore = 0.3 + ((precip - 2) / 3) * 0.2; // 0.3 to 0.5
+        } else if (precip > 0.5) {
+            precipScore = 0.1 + ((precip - 0.5) / 1.5) * 0.2; // 0.1 to 0.3
+        } else {
+            precipScore = precip / 0.5 * 0.1; // 0 to 0.1
+        }
+        factors.push({ name: 'precipitation', value: precipScore, weight: 0.2 });
+        
+        // Visibility contribution (low visibility = more dangerous)
+        const visibility = weatherData?.visibility || 10;
+        let visibilityScore = 0;
+        if (visibility < 1) {
+            visibilityScore = 0.5; // Very low visibility
+        } else if (visibility < 3) {
+            visibilityScore = 0.3;
+        } else if (visibility < 5) {
+            visibilityScore = 0.15;
+        } else {
+            visibilityScore = 0;
+        }
+        factors.push({ name: 'visibility', value: visibilityScore, weight: 0.1 });
+        
+        // Cloud cover contribution (very high cloud cover can indicate storms)
+        const clouds = parseFloat(cloudCover) || 0;
+        let cloudScore = 0;
+        if (clouds > 90) {
+            cloudScore = 0.2;
+        } else if (clouds > 75) {
+            cloudScore = 0.1;
+        }
+        factors.push({ name: 'cloudCover', value: cloudScore, weight: 0.05 });
+        
+        // Calculate weighted average
+        let totalWeight = 0;
+        factors.forEach(factor => {
+            score += factor.value * factor.weight;
+            totalWeight += factor.weight;
+        });
+        score = score / totalWeight; // Normalize
+        
+        // Ensure score is between 0 and 1
+        score = Math.max(0, Math.min(1, score));
+        
+        return {
+            score: score,
+            weatherType: weatherType,
+            factors: factors
+        };
+    }
+    
+    // Get star shape parameters based on weather type and inclement score
+    getStarShapeParams(inclementData, baseSides) {
+        const { score, weatherType } = inclementData;
+        
+        // Base number of points for the star
+        let starPoints = baseSides;
+        
+        // Different spike patterns for different weather types
+        let spikeIntensity = 0; // 0 = no spikes (regular polygon), 1 = maximum spikes
+        let spikeSharpness = 0.3; // How sharp the spikes are (0.2 = soft, 0.5 = very sharp)
+        let innerRadiusRatio = 0.5; // How far inward the spikes go (0.3 = deep spikes, 0.7 = shallow)
+        
+        if (score > 0.1) { // Start showing spikes even for mild inclement weather
+            spikeIntensity = score; // Gradual transition
+            
+            switch (weatherType) {
+                case 'thunderstorm':
+                    // Sharp, aggressive spikes - many points, very sharp
+                    starPoints = Math.max(8, Math.min(16, baseSides + Math.floor(score * 8)));
+                    spikeSharpness = 0.4 + (score * 0.2); // 0.4 to 0.6
+                    innerRadiusRatio = 0.3 + (score * 0.2); // 0.3 to 0.5 (deeper spikes)
+                    break;
+                    
+                case 'heavy_rain':
+                    // Medium spikes, more points
+                    starPoints = Math.max(6, Math.min(12, baseSides + Math.floor(score * 6)));
+                    spikeSharpness = 0.3 + (score * 0.15); // 0.3 to 0.45
+                    innerRadiusRatio = 0.4 + (score * 0.2); // 0.4 to 0.6
+                    break;
+                    
+                case 'heavy_snow':
+                    // Softer, more numerous spikes (snowflake-like)
+                    starPoints = Math.max(6, Math.min(12, baseSides + Math.floor(score * 6)));
+                    spikeSharpness = 0.25 + (score * 0.1); // 0.25 to 0.35 (softer)
+                    innerRadiusRatio = 0.45 + (score * 0.15); // 0.45 to 0.6
+                    break;
+                    
+                case 'high_wind':
+                    // Asymmetric, directional spikes
+                    starPoints = Math.max(6, Math.min(10, baseSides + Math.floor(score * 4)));
+                    spikeSharpness = 0.35 + (score * 0.15); // 0.35 to 0.5
+                    innerRadiusRatio = 0.35 + (score * 0.2); // 0.35 to 0.55
+                    break;
+                    
+                case 'showers':
+                    // Gentle spikes
+                    starPoints = Math.max(5, Math.min(8, baseSides + Math.floor(score * 3)));
+                    spikeSharpness = 0.2 + (score * 0.1); // 0.2 to 0.3
+                    innerRadiusRatio = 0.5 + (score * 0.15); // 0.5 to 0.65 (shallower)
+                    break;
+                    
+                case 'light_precip':
+                    // Very gentle spikes
+                    starPoints = Math.max(4, Math.min(6, baseSides + Math.floor(score * 2)));
+                    spikeSharpness = 0.2 + (score * 0.05); // 0.2 to 0.25
+                    innerRadiusRatio = 0.55 + (score * 0.1); // 0.55 to 0.65
+                    break;
+                    
+                case 'fog':
+                    // Minimal spikes, more about shape distortion
+                    starPoints = Math.max(3, Math.min(5, baseSides + Math.floor(score * 2)));
+                    spikeSharpness = 0.15 + (score * 0.05); // 0.15 to 0.2
+                    innerRadiusRatio = 0.6 + (score * 0.1); // 0.6 to 0.7
+                    break;
+                    
+                default:
+                    // Normal weather - gradual transition based on score
+                    starPoints = Math.max(3, Math.min(8, baseSides + Math.floor(score * 5)));
+                    spikeSharpness = 0.25 + (score * 0.15); // 0.25 to 0.4
+                    innerRadiusRatio = 0.5 + (score * 0.2); // 0.5 to 0.7
+            }
+        }
+        
+        return {
+            starPoints: starPoints,
+            spikeIntensity: spikeIntensity,
+            spikeSharpness: spikeSharpness,
+            innerRadiusRatio: innerRadiusRatio
+        };
+    }
+    
+    // Generate star/spiky clip-path
+    generateStarClipPath(starParams, size) {
+        const { starPoints, spikeIntensity, spikeSharpness, innerRadiusRatio } = starParams;
+        const points = [];
+        
+        // If no spikes, return regular polygon with smooth corners
+        if (spikeIntensity <= 0) {
+            // For very smooth shapes (low inclement score), use more points
+            const smoothPoints = starPoints > 10 ? starPoints : Math.max(starPoints, 12);
+            return this.generatePolygonClipPath(smoothPoints, size);
+        }
+        
+        // Generate star shape with alternating outer and inner points
+        for (let i = 0; i < starPoints; i++) {
+            const angle = (i * 2 * Math.PI) / starPoints - Math.PI / 2; // Start from top
+            
+            // Outer point (spike tip)
+            const outerRadius = 50; // Percentage from center
+            const outerX = 50 + outerRadius * Math.cos(angle);
+            const outerY = 50 + outerRadius * Math.sin(angle);
+            points.push(`${outerX}% ${outerY}%`);
+            
+            // Inner point (between spikes) - position varies based on spike intensity
+            const nextAngle = ((i + 1) * 2 * Math.PI) / starPoints - Math.PI / 2;
+            const midAngle = (angle + nextAngle) / 2;
+            
+            // Interpolate inner radius based on spike intensity
+            // Higher intensity = deeper spikes (lower inner radius)
+            const innerRadius = outerRadius * (innerRadiusRatio + (1 - innerRadiusRatio) * (1 - spikeIntensity));
+            
+            // Apply sharpness: sharper spikes have inner points closer to the spike tips
+            const sharpnessOffset = spikeSharpness * (outerRadius - innerRadius);
+            const adjustedInnerRadius = innerRadius + sharpnessOffset;
+            
+            const innerX = 50 + adjustedInnerRadius * Math.cos(midAngle);
+            const innerY = 50 + adjustedInnerRadius * Math.sin(midAngle);
+            points.push(`${innerX}% ${innerY}%`);
+        }
+        
+        return `polygon(${points.join(', ')})`;
+    }
+
     // Generate polygon clip-path
     generatePolygonClipPath(sides, size) {
         const points = [];
@@ -794,6 +1270,42 @@ class WeatherAura {
         }
         
         return `polygon(${points.join(', ')})`;
+    }
+    
+    // Generate shape clip-path (polygon or star based on inclement weather)
+    generateShapeClipPath(cloudCover, weatherData, windSpeed, precipitation, size) {
+        // Get base polygon sides from cloud cover
+        const baseSides = this.getPolygonSides(cloudCover);
+        
+        // Calculate inclement weather score
+        const inclementData = this.calculateInclementScore(weatherData, windSpeed, precipitation, cloudCover);
+        
+        // Store inclement data for display
+        this.currentInclementData = inclementData;
+        
+        // Get star shape parameters
+        const starParams = this.getStarShapeParams(inclementData, baseSides);
+        
+        // For very low scores, increase polygon points for smoother appearance
+        if (inclementData.score < 0.2 && starParams.spikeIntensity <= 0) {
+            starParams.starPoints = Math.max(starParams.starPoints, 16);
+        }
+        
+        // Generate the appropriate shape
+        const clipPath = this.generateStarClipPath(starParams, size);
+        
+        // Calculate border-radius based on inclement score
+        // Low score (0) = smooth/round (50% = circle), High score (1) = sharp/angular (0%)
+        // Note: border-radius works in combination with clip-path in some cases
+        // For very smooth shapes (score < 0.1), use maximum border-radius
+        const borderRadius = inclementData.score < 0.1 
+            ? '50%' 
+            : `${(1 - inclementData.score) * 50}%`;
+        
+        return {
+            clipPath: clipPath,
+            borderRadius: borderRadius
+        };
     }
 
     // Get wind effect on gradient blending
@@ -841,7 +1353,7 @@ class WeatherAura {
 
     // MODE 1: Radial - Classic radial gradients with shadows
     generateRadialAura(params) {
-        const { baseHue, tempHue, saturation, windEffect, altitudeIntensity, clouds, precipEffect, weatherData } = params;
+        const { baseHue, tempHue, saturation, windEffect, altitudeIntensity, clouds, precip, wind, precipEffect, weatherData } = params;
         const size = 400;
         
         const gradients = [];
@@ -954,9 +1466,11 @@ class WeatherAura {
         // Add glossy/wet surface effect using filter
         const wetGloss = precipEffect.intensity > 0.1 ? `contrast(${1 + precipEffect.glossIntensity * 0.2}) brightness(${1 + precipEffect.glossIntensity * 0.1})` : '';
         
+        const shapeData = this.generateShapeClipPath(clouds, weatherData, wind, precip, size);
         return {
             background: adjustedGradients.join(', '),
-            clipPath: this.generatePolygonClipPath(this.getPolygonSides(clouds), size),
+            clipPath: shapeData.clipPath,
+            borderRadius: shapeData.borderRadius,
             filter: `brightness(${altitudeIntensity * uvBrightness * dayNightBrightness}) blur(${totalBlur}px) saturate(${100 - (precipEffect.desaturation * 50)}%) ${wetGloss}`,
             boxShadow: `${shadowOffset}px ${shadowOffset}px ${shadowBlur}px ${shadowColor}`,
             size: size,
@@ -966,7 +1480,7 @@ class WeatherAura {
 
     // MODE 2: Layered - Stacked concentric layers with linear gradients
     generateLayeredAura(params) {
-        const { baseHue, tempHue, saturation, windEffect, altitudeIntensity, clouds, precipEffect, weatherData } = params;
+        const { baseHue, tempHue, saturation, windEffect, altitudeIntensity, clouds, precip, wind, precipEffect, weatherData } = params;
         const size = 400;
         
         const gradients = [];
@@ -1058,9 +1572,11 @@ class WeatherAura {
         // Add glossy/wet surface effect
         const wetGloss = precipEffect.intensity > 0.1 ? `contrast(${1 + precipEffect.glossIntensity * 0.2}) brightness(${1 + precipEffect.glossIntensity * 0.1})` : '';
         
+        const shapeData = this.generateShapeClipPath(clouds, weatherData, wind, precip, size);
         return {
             background: gradients.join(', '),
-            clipPath: this.generatePolygonClipPath(this.getPolygonSides(clouds), size),
+            clipPath: shapeData.clipPath,
+            borderRadius: shapeData.borderRadius,
             filter: `brightness(${altitudeIntensity * dayNightBrightness}) blur(${precipEffect.blur}px) saturate(${100 - (precipEffect.desaturation * 50)}%) ${wetGloss}`,
             boxShadow: `${shadowOffset + pressureEffect}px ${shadowOffset + pressureEffect}px ${shadowBlur}px ${shadowColor}`,
             size: size
@@ -1069,7 +1585,7 @@ class WeatherAura {
 
     // MODE 3: Swirl - Smooth, flowing spiral/whirlpool with large continuous gradients
     generateSwirlAura(params) {
-        const { baseHue, tempHue, saturation, windEffect, altitudeIntensity, clouds, precipEffect, weatherData } = params;
+        const { baseHue, tempHue, saturation, windEffect, altitudeIntensity, clouds, precip, wind, precipEffect, weatherData } = params;
         const size = 400;
         
         const gradients = [];
@@ -1137,9 +1653,11 @@ class WeatherAura {
             }
         }
         
+        const shapeData = this.generateShapeClipPath(clouds, weatherData, wind, precip, size);
         return {
             background: gradients.join(', '),
-            clipPath: this.generatePolygonClipPath(this.getPolygonSides(clouds), size),
+            clipPath: shapeData.clipPath,
+            borderRadius: shapeData.borderRadius,
             filter: `brightness(${altitudeIntensity * dayNightBrightness}) blur(${windEffect.turbulence * 2 + precipEffect.blur}px) saturate(${100 - (precipEffect.desaturation * 50)}%)`,
             boxShadow: `${shadowOffset}px ${shadowOffset}px ${shadowBlur}px ${shadowColor}`,
             size: size,
@@ -1149,7 +1667,7 @@ class WeatherAura {
 
     // MODE 4: Linear - Top-to-bottom and diagonal linear gradients
     generateLinearAura(params) {
-        const { baseHue, tempHue, saturation, windEffect, altitudeIntensity, clouds, precipEffect, weatherData } = params;
+        const { baseHue, tempHue, saturation, windEffect, altitudeIntensity, clouds, precip, wind, precipEffect, weatherData } = params;
         const size = 400;
         
         const gradients = [];
@@ -1226,9 +1744,11 @@ class WeatherAura {
         // Add glossy/wet surface effect
         const wetGloss = precipEffect.intensity > 0.1 ? `contrast(${1 + precipEffect.glossIntensity * 0.2}) brightness(${1 + precipEffect.glossIntensity * 0.1})` : '';
         
+        const shapeData = this.generateShapeClipPath(clouds, weatherData, wind, precip, size);
         return {
             background: gradients.join(', '),
-            clipPath: this.generatePolygonClipPath(this.getPolygonSides(clouds), size),
+            clipPath: shapeData.clipPath,
+            borderRadius: shapeData.borderRadius,
             filter: `brightness(${altitudeIntensity * uvBrightness * dayNightBrightness}) blur(${precipEffect.blur}px) saturate(${100 - (precipEffect.desaturation * 50)}%) ${wetGloss}`,
             boxShadow: `${shadowOffset}px ${shadowOffset}px ${shadowBlur}px ${shadowColor}`,
             size: size
@@ -1237,7 +1757,7 @@ class WeatherAura {
 
     // MODE 5: Particle - Scattered pointillist effect with many small gradients
     generateParticleAura(params) {
-        const { baseHue, tempHue, saturation, windEffect, altitudeIntensity, clouds, precipEffect, weatherData } = params;
+        const { baseHue, tempHue, saturation, windEffect, altitudeIntensity, clouds, precip, wind, precipEffect, weatherData } = params;
         const size = 400;
         
         const gradients = [];
@@ -1313,9 +1833,11 @@ class WeatherAura {
             }
         }
         
+        const shapeData = this.generateShapeClipPath(clouds, weatherData, wind, precip, size);
         return {
             background: gradients.join(', '),
-            clipPath: this.generatePolygonClipPath(this.getPolygonSides(clouds), size),
+            clipPath: shapeData.clipPath,
+            borderRadius: shapeData.borderRadius,
             filter: `brightness(${altitudeIntensity * dayNightBrightness}) blur(${precipEffect.blur * 0.5}px) saturate(${100 - (precipEffect.desaturation * 50)}%)`,
             boxShadow: `${shadowOffset}px ${shadowOffset}px ${shadowBlur}px ${shadowColor}`,
             size: size
@@ -1324,7 +1846,7 @@ class WeatherAura {
 
     // MODE 6: Fractal - Recursive geometric patterns with clear structure
     generateFractalAura(params) {
-        const { baseHue, tempHue, saturation, windEffect, altitudeIntensity, clouds, precipEffect, weatherData } = params;
+        const { baseHue, tempHue, saturation, windEffect, altitudeIntensity, clouds, precip, wind, precipEffect, weatherData } = params;
         const size = 400;
         
         const gradients = [];
@@ -1431,9 +1953,11 @@ class WeatherAura {
             }
         }
         
+        const shapeData = this.generateShapeClipPath(clouds, weatherData, wind, precip, size);
         return {
             background: gradients.join(', '),
-            clipPath: this.generatePolygonClipPath(this.getPolygonSides(clouds), size),
+            clipPath: shapeData.clipPath,
+            borderRadius: shapeData.borderRadius,
             filter: `brightness(${altitudeIntensity * dayNightBrightness}) contrast(${(1 + windEffect.turbulence) * contrastModifier}) blur(${precipEffect.blur * 0.3}px) saturate(${100 - (precipEffect.desaturation * 50)}%)`,
             boxShadow: `${shadowOffset}px ${shadowOffset}px ${shadowBlur}px ${shadowColor}`,
             size: size
@@ -1466,6 +1990,7 @@ class WeatherAura {
             altitudeIntensity,
             clouds,
             precip,
+            wind,
             precipEffect,
             weatherData: this.weatherData
         };
@@ -1507,6 +2032,7 @@ class WeatherAura {
         this.aura.style.height = `${auraConfig.size}px`;
         this.aura.style.background = auraConfig.background;
         this.aura.style.clipPath = auraConfig.clipPath;
+        this.aura.style.borderRadius = auraConfig.borderRadius || '0%';
         this.aura.style.filter = auraConfig.filter || 'none';
         this.aura.style.transform = auraConfig.transform || 'none';
         this.aura.style.boxShadow = auraConfig.boxShadow || 'none';
@@ -1519,6 +2045,9 @@ class WeatherAura {
         const baseDuration = Math.max(2 - (wind / 100), 0.8); // Slower base for more natural feel
         // Use cubic-bezier for more organic, natural breathing curve
         this.aura.style.animation = `pulse ${baseDuration}s cubic-bezier(0.4, 0, 0.6, 1) infinite`;
+        
+        // Update inclement display after aura is updated
+        this.updateInclementDisplay();
     }
 
     async randomize() {
@@ -1701,94 +2230,34 @@ class WeatherAura {
         this.updateAura();
     }
 
-    async downloadGIF() {
-        // Disable button during capture
-        if (this.downloadGifBtn) {
-            this.downloadGifBtn.disabled = true;
-            this.downloadGifBtn.textContent = 'Capturing...';
-        }
-
-        try {
-            // Get the aura element and its container
-            const auraElement = this.aura;
-            const auraDisplay = auraElement.closest('.aura-display');
-            
-            // Calculate animation duration from current wind speed
-            const wind = parseFloat(this.windSpeed.value);
-            const baseDuration = Math.max(2 - (wind / 100), 0.8);
-            const animationDuration = baseDuration * 1000; // Convert to milliseconds
-            
-            // Number of frames to capture (30 fps for smooth animation)
-            const fps = 30;
-            const numFrames = Math.ceil((animationDuration / 1000) * fps);
-            const frameDelay = 1000 / fps; // Delay between frames in ms
-            
-            // Create GIF instance
-            const gif = new GIF({
-                workers: 2,
-                quality: 10,
-                width: 400,
-                height: 400,
-                workerScript: 'https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js'
-            });
-
-            // Capture frames
-            for (let i = 0; i < numFrames; i++) {
-                // Wait for the frame to be in the right position in the animation
-                await new Promise(resolve => setTimeout(resolve, frameDelay));
-                
-                // Capture the aura element
-                const canvas = await html2canvas(auraElement, {
-                    backgroundColor: null,
-                    scale: 1,
-                    logging: false,
-                    useCORS: true,
-                    allowTaint: false,
-                    width: 400,
-                    height: 400
-                });
-                
-                // Add frame to GIF
-                gif.addFrame(canvas, { delay: frameDelay });
+    reset() {
+        // Reset all input values to defaults
+        this.latitude.value = 40.7128;
+        this.longitude.value = -74.0060;
+        this.altitude.value = 100;
+        this.cloudCover.value = 50;
+        this.temperature.value = 20;
+        this.airQuality.value = 50;
+        this.windSpeed.value = 10;
+        this.precipitation.value = 0;
+        
+        // Reset location display
+        this.locationDisplay.textContent = 'New York, NY';
+        this.locationSearch.value = '';
+        this.searchStatus.textContent = '';
+        
+        // Reset to radial mode
+        this.modeButtons.forEach(btn => {
+            if (btn.dataset.mode === 'radial') {
+                btn.classList.add('active');
+                this.currentMode = 'radial';
+            } else {
+                btn.classList.remove('active');
             }
-
-            // Render the GIF
-            gif.on('finished', (blob) => {
-                // Create download link
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                
-                // Generate filename with location and timestamp
-                const location = this.locationDisplay.textContent.replace(/[^a-zA-Z0-9]/g, '_') || 'aura';
-                const timestamp = new Date().toISOString().slice(0, 10);
-                a.download = `weather-aura-${location}-${timestamp}.gif`;
-                
-                // Trigger download
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-                
-                // Re-enable button
-                if (this.downloadGifBtn) {
-                    this.downloadGifBtn.disabled = false;
-                    this.downloadGifBtn.textContent = 'Download GIF';
-                }
-            });
-
-            gif.render();
-            
-        } catch (error) {
-            console.error('Error creating GIF:', error);
-            alert('Failed to create GIF. Please try again.');
-            
-            // Re-enable button on error
-            if (this.downloadGifBtn) {
-                this.downloadGifBtn.disabled = false;
-                this.downloadGifBtn.textContent = 'Download GIF';
-            }
-        }
+        });
+        
+        this.updateValueDisplays();
+        this.updateAura();
     }
 }
 

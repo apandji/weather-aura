@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather Aura Now</title>
+    <link rel="stylesheet" href="now.css">
+</head>
+<body>
+    
+    <div class="container">
+        <div class="location-header">
+            <h1 id="location-name">Getting location...</h1>
+            <div class="coordinates">
+                <span id="coordinates">—</span>
+                <span class="elevation">
+                    <span class="elevation-icon">⛰</span>
+                    <span id="elevation">—</span>
+                </span>
+            </div>
+        </div>
+
+        <div class="mode-selector-container">
+            <button class="mode-btn active" data-mode="linear">Linear</button>
+            <button class="mode-btn" data-mode="layered">Layered</button>
+            <button class="mode-btn" data-mode="particle">Particle</button>
+        </div>
+
+        <div class="aura-container">
+            <div id="aura" class="aura-visualization"></div>
+            <div id="weather-details" class="weather-details hidden">
+                <div class="detail-item">
+                    <span class="detail-label">Temperature:</span>
+                    <span id="detail-temp">—</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Wind Speed:</span>
+                    <span id="detail-wind">—</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Air Quality:</span>
+                    <span id="detail-air">—</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Cloud Cover:</span>
+                    <span id="detail-clouds">—</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Precipitation:</span>
+                    <span id="detail-precip">—</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="refresh-btn" class="btn-refresh">Refresh Aura</button>
+        </div>
+
+        <div class="error-message hidden" id="error-message">
+            <p>Unable to get your location. Please enable location permissions and refresh.</p>
+        </div>
+
+        <div class="footer">
+            <span id="collected-date">—</span>
+        </div>
+    </div>
+
+    <script src="now.js"></script>
+</body>
+</html>
+

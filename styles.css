@@ -59,12 +59,16 @@ header h1 {
     gap: 20px;
 }
 
+.aura-container {
+    padding: 40px;
+}
+
 .aura-visualization {
     width: 400px;
     height: 400px;
     position: relative;
-    transition: clip-path 0.5s ease, background 0.5s ease, filter 0.5s ease, transform 0.5s ease, opacity 0.5s ease, box-shadow 0.5s ease;
-    will-change: clip-path, background, filter, transform, box-shadow;
+    transition: clip-path 0.5s ease, background 0.5s ease, filter 0.5s ease, transform 0.5s ease, opacity 0.5s ease, box-shadow 0.5s ease, border-radius 0.5s ease;
+    will-change: clip-path, background, filter, transform, box-shadow, border-radius;
 }
 
 .weather-info {
@@ -93,6 +97,121 @@ header h1 {
 .info-item .label {
     color: #666;
     margin-right: 8px;
+}
+
+.info-item.inclement-item {
+    position: relative;
+    cursor: help;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #ddd;
+}
+
+.inclement-value {
+    font-weight: 500;
+    color: #000;
+}
+
+.inclement-tooltip {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #000;
+    color: #fff;
+    padding: 12px 16px;
+    font-size: 0.75rem;
+    line-height: 1.5;
+    white-space: normal;
+    width: 280px;
+    max-width: calc(100vw - 40px);
+    z-index: 1000;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s, visibility 0.2s;
+    border: 1px solid #fff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    text-align: left;
+}
+
+@media (max-width: 600px) {
+    .inclement-tooltip {
+        width: 240px;
+        font-size: 0.7rem;
+        padding: 10px 12px;
+    }
+    
+    .tooltip-factor {
+        font-size: 0.65rem;
+    }
+    
+    .factor-contribution {
+        font-size: 0.6rem;
+    }
+}
+
+.inclement-tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: #000;
+}
+
+.tooltip-content {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.tooltip-section {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.tooltip-title {
+    font-weight: 500;
+    margin-bottom: 4px;
+    border-bottom: 1px solid #333;
+    padding-bottom: 4px;
+    font-size: 0.8rem;
+}
+
+.tooltip-value {
+    color: #fff;
+    font-size: 0.75rem;
+}
+
+.tooltip-factor {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.7rem;
+    margin: 2px 0;
+}
+
+.factor-name {
+    flex: 1;
+    color: #ccc;
+}
+
+.factor-value {
+    color: #fff;
+    font-weight: 500;
+    min-width: 40px;
+    text-align: right;
+}
+
+.factor-contribution {
+    color: #999;
+    font-size: 0.65rem;
+    min-width: 60px;
+    text-align: right;
 }
 
 .controls-panel {
