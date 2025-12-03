@@ -33,6 +33,10 @@ class WeatherAuraNow {
         this.errorMessage = document.getElementById('error-message');
         this.collectedDate = document.getElementById('collected-date');
         this.modeButtons = document.querySelectorAll('.mode-btn');
+        this.inclementDisplay = document.getElementById('inclement-display');
+        this.inclementItem = document.getElementById('inclement-item');
+        this.inclementTooltip = document.getElementById('inclement-tooltip');
+        this.currentInclementData = null;
     }
 
     attachEventListeners() {
@@ -47,6 +51,20 @@ class WeatherAuraNow {
                 this.updateAura();
             });
         });
+        
+        // Inclement score tooltip hover
+        if (this.inclementItem && this.inclementTooltip) {
+            this.inclementItem.addEventListener('mouseenter', () => {
+                if (this.currentInclementData) {
+                    this.inclementTooltip.style.opacity = '1';
+                    this.inclementTooltip.style.visibility = 'visible';
+                }
+            });
+            this.inclementItem.addEventListener('mouseleave', () => {
+                this.inclementTooltip.style.opacity = '0';
+                this.inclementTooltip.style.visibility = 'hidden';
+            });
+        }
     }
 
     async getUserLocation() {
@@ -216,6 +234,9 @@ class WeatherAuraNow {
             // Update details display
             this.updateDetailsDisplay();
             
+            // Calculate and update inclement score
+            this.updateInclementDisplay();
+            
             // Generate aura
             this.updateAura();
             
@@ -237,6 +258,149 @@ class WeatherAuraNow {
         
         this.detailClouds.textContent = `${this.currentWeather.cloudCover}%`;
         this.detailPrecip.textContent = `${this.currentWeather.precipitation} mm/h`;
+    }
+
+    updateInclementDisplay() {
+        // Try to find element if not already found (in case DOM wasn't ready)
+        if (!this.inclementDisplay) {
+            this.inclementDisplay = document.getElementById('inclement-display');
+        }
+        
+        if (!this.inclementDisplay) {
+            console.warn('Inclement display element not found');
+            return;
+        }
+        
+        // Check if we have weather data
+        if (!this.currentWeather || Object.keys(this.currentWeather).length === 0) {
+            console.warn('No weather data available for inclement score calculation');
+            this.inclementDisplay.textContent = '—';
+            return;
+        }
+        
+        try {
+            // Always recalculate with current weather data
+            const wind = this.currentWeather.windSpeed || 10;
+            const precip = parseFloat(this.currentWeather.precipitation || 0);
+            const clouds = this.currentWeather.cloudCover || 50;
+            
+            this.currentInclementData = this.calculateInclementScore(
+                this.weatherData,
+                wind,
+                precip,
+                clouds
+            );
+            
+            if (!this.currentInclementData || this.currentInclementData.score === undefined || isNaN(this.currentInclementData.score)) {
+                console.warn('Inclement score calculation returned invalid data:', this.currentInclementData);
+                this.inclementDisplay.textContent = '—';
+                return;
+            }
+            
+            const score = this.currentInclementData.score;
+            this.inclementDisplay.textContent = score.toFixed(2);
+            
+            // Update tooltip content
+            this.updateInclementTooltip();
+        } catch (error) {
+            console.error('Error calculating inclement score:', error);
+            this.inclementDisplay.textContent = '—';
+        }
+    }
+
+    updateInclementTooltip() {
+        if (!this.currentInclementData || !this.inclementTooltip) return;
+        
+        const { score, weatherType, factors } = this.currentInclementData;
+        const tooltipContent = this.inclementTooltip.querySelector('.tooltip-content');
+        
+        if (!tooltipContent) return;
+        
+        // Format weather type name
+        const weatherTypeNames = {
+            'thunderstorm': 'Thunderstorm',
+            'heavy_rain': 'Heavy Rain',
+            'heavy_snow': 'Heavy Snow',
+            'high_wind': 'High Wind',
+            'showers': 'Showers',
+            'light_precip': 'Light Precipitation',
+            'fog': 'Fog',
+            'normal': 'Normal'
+        };
+        
+        let html = `<div class="tooltip-section">`;
+        html += `<div class="tooltip-title">Weather Type:</div>`;
+        html += `<div class="tooltip-value">${weatherTypeNames[weatherType] || weatherType}</div>`;
+        html += `</div>`;
+        
+        html += `<div class="tooltip-section">`;
+        html += `<div class="tooltip-title">Contributing Factors:</div>`;
+        
+        // Sort factors by contribution (value * weight)
+        const sortedFactors = factors
+            .map(f => ({
+                ...f,
+                contribution: f.value * f.weight
+            }))
+            .sort((a, b) => b.contribution - a.contribution)
+            .filter(f => f.contribution > 0.01); // Only show factors with meaningful contribution
+        
+        sortedFactors.forEach(factor => {
+            const percentage = (factor.contribution / score * 100).toFixed(0);
+            const factorNames = {
+                'weatherCode': 'Weather Code',
+                'wind': 'Wind Speed',
+                'precipitation': 'Precipitation',
+                'visibility': 'Visibility',
+                'cloudCover': 'Cloud Cover'
+            };
+            
+            html += `<div class="tooltip-factor">`;
+            html += `<span class="factor-name">${factorNames[factor.name] || factor.name}:</span>`;
+            html += `<span class="factor-value">${(factor.value * 100).toFixed(0)}%</span>`;
+            html += `<span class="factor-contribution">(${percentage}% of score)</span>`;
+            html += `</div>`;
+        });
+        
+        html += `</div>`;
+        
+        // Add visual aura explanation
+        html += `<div class="tooltip-section">`;
+        html += `<div class="tooltip-title">Visual Aura Effects:</div>`;
+        
+        // Explain how factors affect the aura visually
+        const auraEffects = [];
+        
+        if (score > 0.1) {
+            auraEffects.push('Higher score = sharper, more angular shape');
+        }
+        
+        const windFactor = factors.find(f => f.name === 'wind');
+        if (windFactor && windFactor.value > 0.3) {
+            auraEffects.push('High wind = faster animation, more layers');
+        }
+        
+        const precipFactor = factors.find(f => f.name === 'precipitation');
+        if (precipFactor && precipFactor.value > 0.3) {
+            auraEffects.push('Precipitation = blur effect, reduced saturation');
+        }
+        
+        const cloudFactor = factors.find(f => f.name === 'cloudCover');
+        if (cloudFactor && cloudFactor.value > 0) {
+            auraEffects.push('Cloud cover = shape complexity (polygon sides)');
+        }
+        
+        if (auraEffects.length === 0) {
+            auraEffects.push('Low score = smooth, rounded shape');
+        }
+        
+        auraEffects.forEach(effect => {
+            html += `<div class="tooltip-value" style="font-size: 0.7rem; margin-top: 2px;">• ${effect}</div>`;
+        });
+        
+        html += `</div>`;
+        
+        tooltipContent.innerHTML = html;
     }
 
     getAirQualityLabel(aqi) {
@@ -366,6 +530,130 @@ class WeatherAuraNow {
             dropletCount: Math.floor(precip / 3),
             glossIntensity: intensity * 0.6,
             highlightCount: Math.floor(precip / 4)
+        };
+    }
+
+    // Calculate inclement weather score (0-1 spectrum)
+    // Combines multiple factors to create a gradual danger/aggressiveness score
+    calculateInclementScore(weatherData, windSpeed, precipitation, cloudCover) {
+        let score = 0;
+        const factors = [];
+        
+        // Weather code severity (WMO codes)
+        const weatherCode = weatherData?.weatherCode || 0;
+        let weatherCodeScore = 0;
+        let weatherType = 'normal';
+        
+        // Thunderstorms (most severe)
+        if (weatherCode >= 95 && weatherCode <= 99) {
+            weatherCodeScore = 0.9 + ((weatherCode - 95) / 4) * 0.1; // 0.9 to 1.0
+            weatherType = 'thunderstorm';
+        }
+        // Heavy snow
+        else if (weatherCode >= 71 && weatherCode <= 77) {
+            weatherCodeScore = 0.6 + ((weatherCode - 71) / 6) * 0.2; // 0.6 to 0.8
+            weatherType = 'heavy_snow';
+        }
+        // Heavy rain
+        else if (weatherCode >= 61 && weatherCode <= 67) {
+            weatherCodeScore = 0.5 + ((weatherCode - 61) / 6) * 0.2; // 0.5 to 0.7
+            weatherType = 'heavy_rain';
+        }
+        // Showers (moderate)
+        else if (weatherCode >= 80 && weatherCode <= 86) {
+            weatherCodeScore = 0.3 + ((weatherCode - 80) / 6) * 0.2; // 0.3 to 0.5
+            weatherType = 'showers';
+        }
+        // Light precipitation
+        else if (weatherCode >= 51 && weatherCode <= 57) {
+            weatherCodeScore = 0.15 + ((weatherCode - 51) / 6) * 0.1; // 0.15 to 0.25
+            weatherType = 'light_precip';
+        }
+        // Fog (reduces visibility)
+        else if (weatherCode >= 45 && weatherCode <= 49) {
+            weatherCodeScore = 0.2;
+            weatherType = 'fog';
+        }
+        
+        factors.push({ name: 'weatherCode', value: weatherCodeScore, weight: 0.4 });
+        
+        // Wind speed contribution (0-1, normalized)
+        // Moderate wind (30-50 km/h) = 0.3-0.5, Strong (50-80) = 0.5-0.7, Very strong (80+) = 0.7-1.0
+        const wind = parseFloat(windSpeed) || 0;
+        let windScore = 0;
+        if (wind > 80) {
+            windScore = 0.7 + Math.min(0.3, (wind - 80) / 100); // 0.7 to 1.0
+        } else if (wind > 50) {
+            windScore = 0.5 + ((wind - 50) / 30) * 0.2; // 0.5 to 0.7
+        } else if (wind > 30) {
+            windScore = 0.3 + ((wind - 30) / 20) * 0.2; // 0.3 to 0.5
+        } else if (wind > 15) {
+            windScore = 0.1 + ((wind - 15) / 15) * 0.2; // 0.1 to 0.3
+        } else {
+            windScore = wind / 15 * 0.1; // 0 to 0.1
+        }
+        
+        // If high wind, override weather type
+        if (windScore > 0.6 && weatherType === 'normal') {
+            weatherType = 'high_wind';
+        }
+        factors.push({ name: 'wind', value: windScore, weight: 0.25 });
+        
+        // Precipitation intensity contribution
+        const precip = parseFloat(precipitation) || 0;
+        let precipScore = 0;
+        if (precip > 10) {
+            precipScore = 0.7 + Math.min(0.3, (precip - 10) / 20); // 0.7 to 1.0
+        } else if (precip > 5) {
+            precipScore = 0.5 + ((precip - 5) / 5) * 0.2; // 0.5 to 0.7
+        } else if (precip > 2) {
+            precipScore = 0.3 + ((precip - 2) / 3) * 0.2; // 0.3 to 0.5
+        } else if (precip > 0.5) {
+            precipScore = 0.1 + ((precip - 0.5) / 1.5) * 0.2; // 0.1 to 0.3
+        } else {
+            precipScore = precip / 0.5 * 0.1; // 0 to 0.1
+        }
+        factors.push({ name: 'precipitation', value: precipScore, weight: 0.2 });
+        
+        // Visibility contribution (low visibility = more dangerous)
+        const visibility = weatherData?.visibility || 10;
+        let visibilityScore = 0;
+        if (visibility < 1) {
+            visibilityScore = 0.5; // Very low visibility
+        } else if (visibility < 3) {
+            visibilityScore = 0.3;
+        } else if (visibility < 5) {
+            visibilityScore = 0.15;
+        } else {
+            visibilityScore = 0;
+        }
+        factors.push({ name: 'visibility', value: visibilityScore, weight: 0.1 });
+        
+        // Cloud cover contribution (very high cloud cover can indicate storms)
+        const clouds = parseFloat(cloudCover) || 0;
+        let cloudScore = 0;
+        if (clouds > 90) {
+            cloudScore = 0.2;
+        } else if (clouds > 75) {
+            cloudScore = 0.1;
+        }
+        factors.push({ name: 'cloudCover', value: cloudScore, weight: 0.05 });
+        
+        // Calculate weighted average
+        let totalWeight = 0;
+        factors.forEach(factor => {
+            score += factor.value * factor.weight;
+            totalWeight += factor.weight;
+        });
+        score = score / totalWeight; // Normalize
+        
+        // Ensure score is between 0 and 1
+        score = Math.max(0, Math.min(1, score));
+        
+        return {
+            score: score,
+            weatherType: weatherType,
+            factors: factors
         };
     }
 

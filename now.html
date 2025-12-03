@@ -26,6 +26,7 @@
             <button class="mode-btn" data-mode="particle">Particle</button>
         </div>
 
+
         <div class="aura-container">
             <div id="aura" class="aura-visualization"></div>
             <div id="weather-details" class="weather-details hidden">
@@ -49,6 +50,19 @@
                     <span class="detail-label">Precipitation:</span>
                     <span id="detail-precip">—</span>
                 </div>
+                <div class="detail-item inclement-item" id="inclement-item">
+                    <span class="detail-label">Inclement Score:</span>
+                    <span id="inclement-display" class="inclement-value">—</span>
+                    <div class="inclement-tooltip" id="inclement-tooltip">
+                        <div class="tooltip-content"></div>
+                    </div>
+                </div>
+                <br>
+                <div class="detail-item">
+                    <span id="collected-date">—</span>
+                </div>
+
+            
             </div>
         </div>
 
