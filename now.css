@@ -80,6 +80,33 @@ body {
     color: #fff;
 }
 
+.unit-selector-container {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+}
+
+.unit-btn {
+    padding: 6px 14px;
+    border: 1px solid #000;
+    background: #fff;
+    color: #000;
+    font-weight: normal;
+    cursor: pointer;
+    font-size: 0.85rem;
+    min-width: 48px;
+}
+
+.unit-btn:hover {
+    background: #000;
+    color: #fff;
+}
+
+.unit-btn.active {
+    background: #000;
+    color: #fff;
+}
+
 .aura-container {
     position: relative;
     display: flex;
@@ -308,6 +335,11 @@ body {
     .mode-btn {
         font-size: 0.85rem;
         padding: 6px 12px;
+    }
+
+    .unit-btn {
+        font-size: 0.8rem;
+        padding: 5px 12px;
     }
 
     .inclement-tooltip {
