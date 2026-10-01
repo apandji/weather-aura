@@ -2,6 +2,7 @@
 class WeatherAuraNow {
     constructor() {
         this.currentMode = 'linear';
+        this.tempUnit = this.loadTempUnitPreference();
         this.weatherData = {
             humidity: 50,
             pressure: 1013,
@@ -14,8 +15,57 @@ class WeatherAuraNow {
         this.currentWeather = {};
         this.showingDetails = false;
         this.initializeElements();
+        this.syncTempUnitButtons();
         this.attachEventListeners();
         this.getUserLocation();
+    }
+
+    loadTempUnitPreference() {
+        try {
+            const stored = localStorage.getItem('weatherAuraTempUnit');
+            if (stored === 'c' || stored === 'f') {
+                return stored;
+            }
+        } catch (error) {
+            console.warn('Unable to read temperature unit preference:', error);
+        }
+        return 'f';
+    }
+
+    saveTempUnitPreference(unit) {
+        try {
+            localStorage.setItem('weatherAuraTempUnit', unit);
+        } catch (error) {
+            console.warn('Unable to save temperature unit preference:', error);
+        }
+    }
+
+    setTempUnit(unit) {
+        if (unit !== 'c' && unit !== 'f') return;
+        this.tempUnit = unit;
+        this.saveTempUnitPreference(unit);
+        this.syncTempUnitButtons();
+        if (this.currentWeather && Object.keys(this.currentWeather).length > 0) {
+            this.updateDetailsDisplay();
+        }
+    }
+
+    syncTempUnitButtons() {
+        if (!this.unitButtons) return;
+        this.unitButtons.forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.unit === this.tempUnit);
+        });
+    }
+
+    formatTemperature(celsius) {
+        if (celsius === undefined || celsius === null || Number.isNaN(Number(celsius))) {
+            return '—';
+        }
+        const value = Number(celsius);
+        if (this.tempUnit === 'f') {
+            return `${Math.round(value * 9 / 5 + 32)}°F`;
+        }
+        return `${Math.round(value)}°C`;
     }
 
     initializeElements() {
@@ -33,6 +83,7 @@ class WeatherAuraNow {
         this.errorMessage = document.getElementById('error-message');
         this.collectedDate = document.getElementById('collected-date');
         this.modeButtons = document.querySelectorAll('.mode-btn');
+        this.unitButtons = document.querySelectorAll('.unit-btn');
         this.inclementDisplay = document.getElementById('inclement-display');
         this.inclementItem = document.getElementById('inclement-item');
         this.inclementTooltip = document.getElementById('inclement-tooltip');
@@ -50,6 +101,9 @@ class WeatherAuraNow {
                 this.currentMode = btn.dataset.mode;
                 this.updateAura();
             });
+        });
+        this.unitButtons.forEach(btn => {
+            btn.addEventListener('click', () => this.setTempUnit(btn.dataset.unit));
         });
         
         // Inclement score tooltip hover
@@ -249,7 +303,7 @@ class WeatherAuraNow {
     }
 
     updateDetailsDisplay() {
-        this.detailTemp.textContent = `${this.currentWeather.temperature}°C`;
+        this.detailTemp.textContent = this.formatTemperature(this.currentWeather.temperature);
         this.detailWind.textContent = `${this.currentWeather.windSpeed} km/h`;
         
         const aqi = this.currentWeather.airQuality || 50;
